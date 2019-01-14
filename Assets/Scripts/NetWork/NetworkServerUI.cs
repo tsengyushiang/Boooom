@@ -13,7 +13,7 @@ public class NetworkServerUI : MonoBehaviour {
     public GameObject[] playersIcons = new GameObject[4];
 
     public GameObject wating;
-    private bool[] playerConnected = new bool[4];
+    private int[] playerConnected = new int[4];
 
     public string GetIP()
     {
@@ -32,7 +32,7 @@ public class NetworkServerUI : MonoBehaviour {
     void Start()
     {
         for (int i = 0; i < playerConnected.Length; i++)
-            playerConnected[i] = false;           
+            playerConnected[i] = -1;           
 
         NetworkServer.Reset();
 
@@ -73,7 +73,7 @@ public class NetworkServerUI : MonoBehaviour {
         wating.GetComponent<Animator>().Play("fade_out");
         for (int i = 0; i < 4; i++)
         {
-            if (playerConnected[i] == true)
+            if (playerConnected[i] != -1)
                 playersIcons[i].GetComponent<IconToplayer>().showIcon();
         }
 
@@ -96,32 +96,56 @@ public class NetworkServerUI : MonoBehaviour {
     {
         Debug.Log(msg.conn.connectionId.ToString() + " Disconnected");
 
-        playerConnected[msg.conn.connectionId  % 4] = false;
-        playersIcons[msg.conn.connectionId % 4].GetComponent<IconToplayer>().hideIcon();
+        for (int i = 0; i < 4; i++)
+        {
+            if (playerConnected[i] == msg.conn.connectionId)
+            {
+                playerConnected[i] = -1;
+                playersIcons[i].GetComponent<IconToplayer>().hideIcon();
 
-        UpdateUI();
+                UpdateUI();
+
+                return;
+            }     
+        }     
     }
 
     public void OnConnected(NetworkMessage msg)
     {
         Debug.Log(msg.conn.connectionId.ToString() + " Connected");
 
-        playerConnected[msg.conn.connectionId % 4] = true;
-        playersIcons[msg.conn.connectionId  % 4].GetComponent<IconToplayer>().showIcon();
+        for (int i = 0; i < 4; i++) {
 
-        StringMessage server2Client = new StringMessage();
-        server2Client.value = players[msg.conn.connectionId % 4].GetComponent<Player>().TeamIndex.ToString();
+            if (playerConnected[i] == -1) {
 
-        NetworkServer.SendToClient(msg.conn.connectionId, 1000,server2Client);
+                playerConnected[i] = msg.conn.connectionId;
+                playersIcons[i].GetComponent<IconToplayer>().showIcon();
 
-        UpdateUI();
+                StringMessage server2Client = new StringMessage();
+                server2Client.value = players[i].GetComponent<Player>().TeamIndex.ToString();
+
+                NetworkServer.SendToClient(msg.conn.connectionId, 1000, server2Client);
+
+                UpdateUI();
+
+                return ;
+            }
+        }
     }
 
     void ServerRecieveMessage(NetworkMessage message)
     {
+        for (int i = 0; i < 4; i++) {
 
-        StringMessage msg = new StringMessage();
-        msg.value = message.ReadMessage<StringMessage>().value;
-        players[message.conn.connectionId %4].GetComponent<Player>().latestPressbtn = int.Parse(msg.value);
+            if (playerConnected[i] == message.conn.connectionId) {
+
+                StringMessage msg = new StringMessage();
+                msg.value = message.ReadMessage<StringMessage>().value;
+                players[i].GetComponent<Player>().latestPressbtn = int.Parse(msg.value);
+
+                return;
+            }
+
+        }       
     }
 }
